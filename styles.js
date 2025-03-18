@@ -19,6 +19,8 @@ export const styles = StyleSheet.create({
     borderRadius: 50,
     alignItems: 'center',
     marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   recordingButton: {
     backgroundColor: '#F44336',
@@ -27,6 +29,7 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
+    marginLeft: 8,
   },
   processingContainer: {
     alignItems: 'center',
@@ -111,7 +114,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
   },
   cancelButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: '#FF5252',
   },
   buttonText: {
     color: 'white',
@@ -134,5 +137,12 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'right',
     marginTop: 5,
+  },
+  recordingControlsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 20,
+    marginVertical: 20,
   },
 });

@@ -10,6 +10,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-community/audio-toolkit": "^2.0.3",
     "@react-native-voice/voice": "^3.2.4",
     "axios": "^1.8.1",
@@ -25,7 +26,8 @@
     "react-native": "0.76.7",
     "react-native-dotenv": "^3.4.11",
     "replicate": "^1.0.1",
-    "web-streams-polyfill": "^4.1.0"
+    "web-streams-polyfill": "^4.1.0",
+    "@expo/vector-icons": "^14.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

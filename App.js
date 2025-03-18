@@ -4,6 +4,9 @@ import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { REPLICATE_API_TOKEN } from '@env';
 import { styles } from './styles';
+import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const RecipeVoiceApp = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -15,6 +18,31 @@ const RecipeVoiceApp = () => {
   const [recording, setRecording] = useState(null);
   const [audioUri, setAudioUri] = useState(null);
 
+  // Add function to save recipes to AsyncStorage
+  const saveRecipesToStorage = async (updatedRecipes) => {
+    try {
+      await AsyncStorage.setItem('savedRecipes', JSON.stringify(updatedRecipes));
+    } catch (e) {
+      console.error('Failed to save recipes', e);
+      setError('Failed to save recipes');
+    }
+  };
+
+  // Load saved recipes on app start
+  useEffect(() => {
+    const loadRecipes = async () => {
+      try {
+        const savedRecipes = await AsyncStorage.getItem('savedRecipes');
+        if (savedRecipes) {
+          setRecipes(JSON.parse(savedRecipes));
+        }
+      } catch (e) {
+        console.error('Failed to load recipes', e);
+      }
+    };
+    
+    loadRecipes();
+  }, []);
 
   const startRecording = async () => {
     try {
@@ -38,14 +66,13 @@ const RecipeVoiceApp = () => {
       
       setRecording(recording);
       setIsRecording(true);
-      Alert.alert('Recording', 'Recording started. Tap the button again to stop.');
+      // Alert removed as requested
     } catch (error) {
       console.error('Failed to start recording:', error);
       setError('Failed to start recording');
       setIsRecording(false);
     }
   };
-
 
   const simulateTranscription = () => {
     return new Promise((resolve) => {
@@ -58,13 +85,21 @@ const RecipeVoiceApp = () => {
 
   const saveRecipe = () => {
     if (currentRecipe) {
-      setRecipes([...recipes, currentRecipe]);
+      // Make sure the recipe has a unique ID
+      const recipeToSave = {
+        ...currentRecipe,
+        id: currentRecipe.id || Date.now().toString(), // Add ID if not already present
+        date: new Date().toISOString() // Add timestamp for sorting/display
+      };
+      
+      const updatedRecipes = [...recipes, recipeToSave];
+      setRecipes(updatedRecipes);
+      saveRecipesToStorage(updatedRecipes); // Save to AsyncStorage
       setModalVisible(false);
       setCurrentRecipe(null);
       setTranscribedText('');
     }
   };
-
 
 const stopRecording = async () => {
   try {
@@ -85,6 +120,29 @@ const stopRecording = async () => {
     setError('Failed to stop recording');
   } finally {
     setIsProcessing(false);
+  }
+};
+
+const cancelRecording = async () => {
+  try {
+    if (!recording) return;
+    
+    setIsRecording(false);
+    
+    await recording.stopAndUnloadAsync();
+    const uri = recording.getURI();
+    
+    // Delete the recording file if needed
+    if (uri) {
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+    }
+    
+    setRecording(null);
+    setAudioUri(null);
+    
+  } catch (err) {
+    console.error('Failed to cancel recording', err);
+    setError('Failed to cancel recording');
   }
 };
 
@@ -242,17 +300,22 @@ const parseRecipeResult = (recipeData) => {
       console.log('Missing ingredients or steps in recipe:', recipeObject);
       // Provide default empty arrays to prevent mapping errors
       return {
+        id: Date.now().toString(), // Add unique ID 
         title: recipeObject.title || 'Untitled Recipe',
         ingredients: recipeObject.ingredients || [],
         steps: recipeObject.steps || []
       };
     }
     
-    return recipeObject;
+    return {
+      ...recipeObject,
+      id: Date.now().toString() // Add unique ID
+    };
   } catch (error) {
     console.error('Error parsing recipe:', error);
     // Return a default recipe structure if parsing fails
     return {
+      id: Date.now().toString(), // Add unique ID
       title: 'Parsing Error',
       ingredients: [],
       steps: []
@@ -316,16 +379,32 @@ const renderRecipeItem = ({ item }) => (
           <ActivityIndicator size="large" color="#4CAF50" />
           <Text style={styles.processingText}>Processing your recipe...</Text>
         </View>
+      ) : isRecording ? (
+        <View style={styles.recordingControlsContainer}>
+          <TouchableOpacity
+            style={[styles.recordButton, styles.recordingButton]}
+            onPress={stopRecording}
+          >
+            <MaterialIcons name="mic" size={24} color="white" />
+            <Text style={styles.recordButtonText}>Stop Recording</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.recordButton, styles.cancelButton]}
+            onPress={cancelRecording}
+          >
+            <MaterialIcons name="cancel" size={24} color="white" />
+            <Text style={styles.recordButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <TouchableOpacity
-          style={[styles.recordButton, isRecording && styles.recordingButton]}
-          onPress={isRecording ? stopRecording : startRecording}
-        >
-        <Button
-          title={isRecording ? "Stop Recording" : "Start Recording"}
-          onPress={isRecording ? stopRecording : startRecording}
+          style={styles.recordButton}
+          onPress={startRecording}
           disabled={isProcessing}
-        />
+        >
+          <MaterialIcons name="mic-none" size={24} color="white" />
+          <Text style={styles.recordButtonText}>Start Recording</Text>
         </TouchableOpacity>
       )}
       
@@ -353,12 +432,12 @@ const renderRecipeItem = ({ item }) => (
             <>
               <Text style={styles.modalTitle}>{currentRecipe.title}</Text>
               <Text style={styles.sectionTitle}>Ingredients:</Text>
-              {currentRecipe.ingredients.map((ingredient, index) => (
-                <Text key={index} style={styles.ingredient}>• {ingredient}</Text>
+              {currentRecipe.ingredients && currentRecipe.ingredients.map((ingredient, index) => (
+                <Text key={`ingredient-${index}`} style={styles.ingredient}>• {ingredient}</Text>
               ))}
               <Text style={styles.sectionTitle}>Instructions:</Text>
-              {currentRecipe.steps.map((step, index) => (
-                <Text key={index} style={styles.step}>{index + 1}. {step}</Text>
+              {currentRecipe.steps && currentRecipe.steps.map((step, index) => (
+                <Text key={`step-${index}`} style={styles.step}>{index + 1}. {step}</Text>
               ))}
               
               <View style={styles.buttonRow}>
